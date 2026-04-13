@@ -237,7 +237,16 @@ Wait for the response, then proceed to Phase 2.
 
 ### Phase 2: The Interview
 
-Ask questions **one category at a time** (not all at once). Present each category as a numbered group, wait for answers, then move to the next category.
+Ask questions **one at a time** using `AskUserQuestion`. This is a wizard — each step gets ONE focused question, the user answers, then you move to the next. NEVER dump multiple questions in a single message.
+
+**Grouping exception**: Questions that are tightly related and trivially short (e.g., "Backend language?" + "Framework?") MAY be grouped into a single `AskUserQuestion` with max 2-3 sub-questions. But the default is ONE question per turn.
+
+**Flow for each question:**
+1. Use `AskUserQuestion` with a clear, specific question
+2. If relevant, provide concrete options (not open-ended when avoidable)
+3. Mark your recommended option with a star (★)
+4. Wait for the answer
+5. Acknowledge briefly, then ask the next question
 
 **IMPORTANT**: If Phase 0 already answered a question (from existing files), state what you found and ask the user to confirm or override. Don't re-ask what's already decided.
 
@@ -245,9 +254,11 @@ For each question: if the user says "I don't know" or "not sure", offer 2-3 conc
 
 If a user answers in their native language, respond in the same language for that exchange, but keep all generated documents in English (code-facing) or as specified by the language decision.
 
+**Smart skipping**: For simple projects (vanilla HTML, static sites, small games), many questions are irrelevant. If the project scope makes a question obviously N/A (e.g., "Multi-tenancy?" for a single-page Snake game), skip it and note your assumption. The user can always override later.
+
 ---
 
-#### Category 1: Vision & Identity (ask first, wait for answers)
+#### Category 1: Vision & Identity (ask one at a time)
 
 1. **Project Name**: What is the project called? (will be used for repo name, kebab-case)
 2. **Elevator Pitch**: One sentence — what does it do and for whom?
@@ -255,7 +266,7 @@ If a user answers in their native language, respond in the same language for tha
 4. **Target Users**: Who are the primary users? Describe 2-3 user personas (role, tech-savviness, frequency of use).
 5. **Core Modules**: What are the major functional areas? (e.g., "Tickets, Time Tracking, Billing" — NOT individual features, but high-level modules)
 
-#### Category 2: Core Principles (ask after Category 1 — these become constitution principles)
+#### Category 2: Core Principles (one at a time — these become constitution principles)
 
 6. **Non-Negotiables**: What are the 3-5 things that are SACRED in this project? Things you will never compromise on. (e.g., "multi-tenant isolation", "offline-first", "Swedish UI, English code", "Excel parity")
 7. **Architecture Philosophy**: Monolith or microservices? Convention over configuration? Shared code or duplication? What's your gut feeling?
@@ -263,7 +274,7 @@ If a user answers in their native language, respond in the same language for tha
 9. **Integration First**: Will this system integrate with external services? Which ones are critical? (e.g., Fortnox, Stripe, Slack, email providers)
 10. **Automation Stance**: What should be automated vs manual? What calculations, notifications, or workflows should happen without human intervention?
 
-#### Category 3: Tech Stack (ask after Category 2)
+#### Category 3: Tech Stack (group backend + frontend as 2-3 per turn max)
 
 11. **Programming Language**: Backend language? Any constraints or preferences?
 12. **Backend Framework**: Framework choice? (e.g., ASP.NET Minimal API, Express, Django, Spring Boot)
@@ -271,14 +282,14 @@ If a user answers in their native language, respond in the same language for tha
 14. **Database Engine**: Which database and why? (PostgreSQL, SQLite, SQL Server, MongoDB, etc.) ORM or raw SQL?
 15. **State Management**: Client state management approach? (e.g., TanStack Query for server state, Zustand for client state)
 
-#### Category 4: Authentication & Multi-tenancy (ask after Category 3)
+#### Category 4: Authentication & Multi-tenancy (skip if N/A for project scope)
 
 16. **Auth Method**: How do users log in? (email/password, OAuth, SSO/SAML, passkeys/WebAuthn, magic links)
 17. **Authorization Model**: Simple roles, RBAC, ABAC, or per-resource permissions?
 18. **Multi-tenancy**: Single-tenant or multi-tenant? If multi-tenant: shared DB, schema-per-tenant, or DB-per-tenant?
 19. **Auth Provider**: Build your own or use a service? (ASP.NET Identity, Auth0, Clerk, Keycloak, Supabase Auth)
 
-#### Category 5: Frontend & UX Principles (ask after Category 4)
+#### Category 5: Frontend & UX Principles (one at a time)
 
 20. **Application Type**: SPA, SSR, SSG, hybrid, or admin dashboard?
 21. **Component Library**: Existing component library or custom? (Tailwind + Headless UI, shadcn/ui, Material UI, Ant Design, Bootstrap, custom)
@@ -286,7 +297,7 @@ If a user answers in their native language, respond in the same language for tha
 23. **Language & Localization**: UI language? Code language? Commit message language? Multi-language support needed?
 24. **Accessibility**: WCAG level target? (A, AA, AAA)
 
-#### Category 6: Visual Design & Identity (ask after Category 5 — this feeds the `frontend-design` and `ui-ux-pro-max` skills)
+#### Category 6: Visual Design & Identity (one at a time — feeds `frontend-design` and `ui-ux-pro-max` skills)
 
 25. **Design Personality**: What feeling should the UI evoke? Pick one or describe your own:
     - Brutally minimal / clean
@@ -319,7 +330,7 @@ If a user answers in their native language, respond in the same language for tha
 31. **Logo & Brand**: Do you have an existing logo/brand identity, or is that also being created from scratch? Any brand guidelines to follow?
 32. **Design System Persistence**: Should we generate a `design-system/MASTER.md` file that locks down the visual rules for all pages? (Recommended: yes — this prevents visual drift as you build more pages.) The `frontend-design` skill will reference this file for every UI component it builds.
 
-#### Category 7: Infrastructure, Deployment & Services (ask after Category 6)
+#### Category 7: Infrastructure, Deployment & Services (one at a time, skip if simple static project)
 
 This category MUST be informed by Phase 0 context absorption. If `.claude/docs/deployment.md` was found, present the existing infrastructure as the default option. For Johan's projects, the standard infrastructure is the Noisy Cricket Linux cluster (live4.se) — always offer this as the primary option.
 
@@ -381,7 +392,7 @@ This category MUST be informed by Phase 0 context absorption. If `.claude/docs/d
     - `.env` files (local dev only)
     - Other
 
-#### Category 8: Quality & Workflow (ask after Category 7)
+#### Category 8: Quality & Workflow (one at a time)
 
 40. **Testing Strategy**: Unit, integration, E2E? Minimum bar for MVP?
 41. **Monitoring**: Logging, metrics, error tracking? (Sentry, Datadog, Grafana, Application Insights)
@@ -900,18 +911,19 @@ The project DNA is now in place. Every Claude session in this project will know 
 
 ## Rules
 
-1. NEVER skip Phase 0. Context absorption is mandatory. Read everything before asking anything.
-2. NEVER skip a category in Phase 2. Every category must be asked even if the user seems eager to move on.
-3. If Phase 0 found existing answers, present them as "I found X — is this still correct?" instead of re-asking.
-4. If the user gives a one-word answer, probe deeper. "PostgreSQL" is not enough — ask about their experience level and specific needs.
-5. If the user contradicts a previous answer or an existing file, point it out and ask them to clarify.
-6. Offer your professional opinion when the user is unsure. Say "I recommend X because Y" — don't just list options.
-7. Keep the tone professional but conversational. This is a consulting session, not a form.
-8. If the project idea is fundamentally flawed, say so diplomatically and suggest pivots.
-9. Track all answers internally so nothing is lost between conversation turns.
-10. The constitution is the most important output. Each principle must be concrete, actionable, and use MUST/SHOULD/MAY language. Vague principles like "write clean code" are worthless — be specific.
-11. CLAUDE.md must match the user's established patterns. The hireflow CLAUDE.md is the gold standard reference.
-12. If `CLAUDE.md` already exists, use the Edit tool to surgically update only the project-specific section. Do NOT overwrite the rest of the file.
-13. The constitution version always starts at 1.0.0 for a new project.
-14. All dates in generated files must use the actual current date, not placeholders.
-15. If sibling projects use the same stack, reference their patterns (e.g., "Reference `/Users/jool/repos/matchgrid/` for GitHub deploy patterns").
+1. NEVER skip Phase -1 or Phase 0. Bootstrap and context absorption are mandatory.
+2. **ONE QUESTION AT A TIME.** Use `AskUserQuestion` for each question. NEVER dump multiple questions in a single message. The only exception: 2-3 tightly related trivial sub-questions may be grouped (e.g., "Backend language + framework?"). This is a wizard, not a survey form.
+3. NEVER skip a category in Phase 2. Every category must be asked even if the user seems eager to move on. However, individual questions within a category MAY be skipped if obviously N/A for the project scope (e.g., skip "Multi-tenancy?" for a static HTML game).
+4. If Phase 0 found existing answers, present them as "I found X — is this still correct?" instead of re-asking.
+5. If the user gives a one-word answer, probe deeper. "PostgreSQL" is not enough — ask about their experience level and specific needs.
+6. If the user contradicts a previous answer or an existing file, point it out and ask them to clarify.
+7. Offer your professional opinion when the user is unsure. Say "I recommend X because Y" — don't just list options.
+8. Keep the tone professional but conversational. This is a consulting session, not a form.
+9. If the project idea is fundamentally flawed, say so diplomatically and suggest pivots.
+10. Track all answers internally so nothing is lost between conversation turns.
+11. The constitution is the most important output. Each principle must be concrete, actionable, and use MUST/SHOULD/MAY language. Vague principles like "write clean code" are worthless — be specific.
+12. CLAUDE.md must match the user's established patterns. The hireflow CLAUDE.md is the gold standard reference.
+13. If `CLAUDE.md` already exists, use the Edit tool to surgically update only the project-specific section. Do NOT overwrite the rest of the file.
+14. The constitution version always starts at 1.0.0 for a new project.
+15. All dates in generated files must use the actual current date, not placeholders.
+16. If sibling projects use the same stack, reference their patterns (e.g., "Reference `/Users/jool/repos/matchgrid/` for GitHub deploy patterns").
