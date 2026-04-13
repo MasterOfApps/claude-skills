@@ -24,6 +24,94 @@ $ARGUMENTS
 
 ## Process
 
+### Phase -1: Project Bootstrap (AUTOMATIC — runs before anything else)
+
+This phase ensures speckit is installed/updated and the project has the latest Claude Code configuration synced from the template repo. It runs automatically — no user interaction needed unless something goes wrong.
+
+**Step 1 — Install/update speckit CLI:**
+
+```bash
+uv tool install specify-cli --force --from git+https://github.com/github/spec-kit.git
+```
+
+If `uv` is not installed, tell the user to install it first (`curl -LsSf https://astral.sh/uv/install.sh | sh`) and stop.
+
+**Step 2 — Backup existing constitution (if present):**
+
+```bash
+if [ -f .specify/memory/constitution.md ]; then
+  cp .specify/memory/constitution.md .specify/memory/constitution-backup.md
+  echo "[BACKUP] Constitution backed up"
+else
+  echo "[SKIP] No existing constitution to back up"
+fi
+```
+
+**Step 3 — Initialize/reinitialize speckit:**
+
+```bash
+specify init --here --force --ai claude
+```
+
+This creates/resets the `.specify/` directory structure with templates, scripts, and Claude integration.
+
+**Step 4 — Restore constitution backup:**
+
+```bash
+if [ -f .specify/memory/constitution-backup.md ]; then
+  mv .specify/memory/constitution-backup.md .specify/memory/constitution.md
+  echo "[RESTORED] Constitution restored from backup"
+else
+  echo "[SKIP] No backup to restore"
+fi
+```
+
+**Step 5 — Fetch and execute sync-prompt:**
+
+Fetch the latest sync-prompt from the template repo:
+
+```bash
+curl -sL https://raw.githubusercontent.com/johanolofsson72/Claude/main/scripts/sync-prompt.md
+```
+
+Read the fetched content and **execute all instructions between the `---` markers**. This means:
+
+1. Read all template files from the fetched content's instructions (the sync-prompt references `/Users/jool/repos/Claude` as the template source — but since we fetched it remotely, use `curl` to fetch each referenced file from `https://raw.githubusercontent.com/johanolofsson72/Claude/main/` instead of reading local paths)
+2. Read this project's existing `.claude/` files
+3. Perform the language migration check
+4. Analyze and update/merge files per the sync-prompt's rules (copy missing, update outdated, merge project-specific)
+5. Verify spec testing pipeline
+6. Install required external skills (git clone commands)
+7. Ask about tech stack and remove irrelevant files
+8. Verify (valid JSON, CLAUDE.md size, reference files exist)
+9. Report what was synced
+
+**IMPORTANT**: When the sync-prompt references reading files from `/Users/jool/repos/Claude/`, translate those paths to raw GitHub URLs:
+- `/Users/jool/repos/Claude/CLAUDE.md` → `curl -sL https://raw.githubusercontent.com/johanolofsson72/Claude/main/CLAUDE.md`
+- `/Users/jool/repos/Claude/.claude/rules/dotnet.md` → `curl -sL https://raw.githubusercontent.com/johanolofsson72/Claude/main/.claude/rules/dotnet.md`
+- etc.
+
+This ensures the skill works on any machine, not just machines with a local clone of the template repo.
+
+**Step 6 — Report bootstrap status:**
+
+After the sync completes, present a brief summary:
+
+```markdown
+## Bootstrap Complete
+
+**Speckit**: [installed/updated] — version [X]
+**Sync-prompt**: fetched from johanolofsson72/Claude (main)
+**Files synced**: [count created] created, [count updated] updated, [count skipped] skipped
+**Constitution**: [preserved from backup / fresh from speckit / not found]
+
+Proceeding to project inception interview...
+```
+
+Then proceed to Phase 0.
+
+---
+
 ### Phase 0: Context Absorption (MANDATORY — do this BEFORE asking a single question)
 
 Before you open your mouth, you read everything available. Scan the following files IN THIS ORDER. For each file: if it exists, read it and absorb. If it doesn't exist, skip silently.

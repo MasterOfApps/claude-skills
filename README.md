@@ -22,7 +22,8 @@ bash install.sh
 
 | Skill | Command | Description |
 |-------|---------|-------------|
-| project-wizard | `/project-wizard` | Project inception wizard — 50 questions across 9 categories. Creates CLAUDE.md, constitution, design system, and project brief. |
+| project-wizard | `/project-wizard` | Project inception wizard — installs speckit, syncs config from template repo, then runs 50 questions across 9 categories. Creates CLAUDE.md, constitution, design system, and project brief. |
+| project-update | `/project-update` | Update speckit and sync Claude Code configuration from the template repo. For existing projects that need the latest rules, docs, agents, skills, and hooks. |
 
 ## Requirements
 
@@ -54,80 +55,41 @@ mkdir my-new-project
 cd my-new-project
 ```
 
-### Step 3: Install speckit
+### Step 3: Run the project wizard
 
-This sets up the `.specify/` directory structure with templates, scripts, and integrations:
-
-```bash
-uv tool install specify-cli --force --from git+https://github.com/github/spec-kit.git
-specify init --here --force --ai claude
-```
-
-### Step 4: Sync Claude Code configuration
-
-Start Claude Code in the project directory:
+Start Claude Code and run the wizard:
 
 ```bash
 claude
 ```
 
-Then paste the contents of the **sync-prompt** into the Claude session. The sync-prompt lives in the Claude template repo:
-
-```
-/Users/jool/repos/Claude/scripts/sync-prompt.md
-```
-
-Copy everything between the `---` markers and paste it into the Claude session. This will:
-
-- Create `CLAUDE.md` with critical rules, execution mode, workflow, verification
-- Set up `.claude/rules/` (dotnet, frontend, security, specs, tests, allium)
-- Set up `.claude/docs/` (testing, conventions, security, git, deployment, etc.)
-- Set up `.claude/agents/` (dotnet-reviewer, security-scanner, test-runner, db-agent)
-- Set up `.claude/skills/` (code-review, explore-codebase, tla, allium, deploy-checklist)
-- Set up `.claude/settings.json` with hooks
-- Install external skills (anthropics/skills, superpowers, trailofbits, qa-test, dotnet, vercel, playwright)
-- Ask which tech stack you're using and remove irrelevant files
-
-**Important:** The sync will ask about your tech stack — answer based on what the project will use.
-
-### Step 5: Preserve the constitution
-
-Speckit created a default constitution during `specify init`. The sync may have touched it. If you want to keep speckit's scaffolding and let the wizard write the real constitution:
-
-```bash
-# No action needed — the wizard overwrites .specify/memory/constitution.md with your real principles
-```
-
-If speckit was already initialized with content you want to keep, back it up before running the wizard:
-
-```bash
-cp .specify/memory/constitution.md .specify/memory/constitution-backup.md
-```
-
-### Step 6: Run the project wizard
-
-Now you have the full Claude Code infrastructure in place. Run the wizard to define your project:
-
-```
-/project-wizard
-```
-
-Or with a pitch:
-
 ```
 /project-wizard An issue tracking system for municipalities
 ```
 
-The wizard will:
-1. Read all the files that were just set up (CLAUDE.md, rules, docs, settings)
-2. Ask ~50 questions across 9 categories
-3. Generate/update:
-   - `CLAUDE.md` — project-specific section
-   - `.specify/memory/constitution.md` — core principles
-   - `design-system/MASTER.md` — visual identity
-   - `PROJECT-BRIEF.md` — stakeholder description
+The wizard automatically handles everything:
+
+1. **Installs/updates speckit** — `uv tool install specify-cli` + `specify init`
+2. **Syncs Claude Code config** — fetches the latest sync-prompt from [johanolofsson72/Claude](https://github.com/johanolofsson72/Claude) and applies it (rules, docs, agents, skills, hooks, settings)
+3. **Preserves constitution** — backs up before speckit init, restores after
+4. **Asks about tech stack** — removes irrelevant files
+5. **Runs the interview** — 50 questions across 9 categories
+6. **Generates foundation docs** — CLAUDE.md, constitution, design system, project brief
 
 After this, every Claude session in the project knows the full context, and you can start writing feature specs with `/speckit-specify`.
+
+### Updating an existing project
+
+To sync an existing project with the latest config (without re-running the interview):
+
+```
+/project-update
+```
+
+Options:
+- `/project-update` — full update (speckit + sync config)
+- `/project-update speckit-only` — only update speckit CLI and templates
+- `/project-update sync-only` — only sync Claude Code config from template repo
 
 ### Quick reference — the full sequence
 
@@ -135,19 +97,20 @@ After this, every Claude session in the project knows the full context, and you 
 # 1. Create project
 mkdir my-project && cd my-project
 
-# 2. Install speckit
-uv tool install specify-cli --force --from git+https://github.com/github/spec-kit.git
-specify init --here --force --ai claude
-
-# 3. Start Claude and sync config
+# 2. Start Claude and run the wizard (handles everything)
 claude
-# → Paste sync-prompt from /Users/jool/repos/Claude/scripts/sync-prompt.md
-
-# 4. Run the wizard (in the same or new Claude session)
 # /project-wizard An issue tracking system for municipalities
 
-# 5. Start building
+# 3. Start building
 # /speckit-specify
+```
+
+### Quick reference — update existing project
+
+```bash
+cd my-project
+claude
+# /project-update
 ```
 
 ## Adding New Skills
