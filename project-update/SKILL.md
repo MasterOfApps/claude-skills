@@ -1,7 +1,7 @@
 ---
 name: project-update
 description: "Update speckit and sync Claude Code configuration from the template repo. Use on existing projects to pull the latest rules, docs, agents, skills, hooks, and settings. Trigger words: update project, sync config, update claude config, sync rules, update speckit, refresh project."
-argument-hint: "[optional: 'speckit-only' or 'sync-only' to run just one part]"
+argument-hint: "[optional: 'speckit-only', 'sync-only', or '--force' to ignore .sync-version cache]"
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Bash, AskUserQuestion, Glob, Grep
 ---
@@ -78,6 +78,25 @@ curl -sL https://raw.githubusercontent.com/johanolofsson72/Claude/main/scripts/s
 ```
 
 Read the fetched content carefully.
+
+### Step 4b: Version check (saves tokens)
+
+The sync-prompt now has a **Step 0: Version check** that compares the template's current commit SHA against `.claude/.sync-version` in this project. Execute it BEFORE reading any template files:
+
+```bash
+TEMPLATE_SHA=$(curl -sL https://api.github.com/repos/johanolofsson72/Claude/commits/main | jq -r '.sha // empty')
+LAST_SHA=$(cat .claude/.sync-version 2>/dev/null)
+```
+
+**Three possible outcomes:**
+
+1. **SHAs match** → Project is already current. Report "already up to date" and skip to Step 7 (verify) and Step 8 (report). Do NOT fetch template files.
+2. **LAST_SHA exists, SHAs differ** → **Incremental sync**. Fetch the changed-files list via GitHub compare API: `curl -sL "https://api.github.com/repos/johanolofsson72/Claude/compare/${LAST_SHA}...${TEMPLATE_SHA}" | jq -r '.files[].filename'`. Then fetch ONLY those changed files instead of all 30+ template files.
+3. **No LAST_SHA** → First-time sync. Fetch all template files as before.
+
+If `$ARGUMENTS` contains `--force` or `force`, skip the version check entirely and do a full sync.
+
+**At the end of sync (Step 8b in sync-prompt):** Write the fetched SHA to `.claude/.sync-version` and commit it.
 
 ### Step 5: Execute sync-prompt instructions
 
