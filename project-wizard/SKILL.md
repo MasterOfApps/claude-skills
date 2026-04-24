@@ -1,6 +1,6 @@
 ---
 name: project-wizard
-description: "Project inception wizard (50 questions across 9 categories) that creates CLAUDE.md, speckit constitution, design system, and project brief. Use when starting a new project, brainstorming an app idea, or bootstrapping a new repo. Trigger words: new project, project idea, start project, inception, bootstrap project."
+description: "Project inception wizard (50 questions across 9 categories plus a 5/10/25 use-case deep dive) that creates CLAUDE.md, speckit constitution, design system, project brief, and specs/use-cases.md. Use when starting a new project, brainstorming an app idea, or bootstrapping a new repo. Trigger words: new project, project idea, start project, inception, bootstrap project."
 argument-hint: "[brief project idea description]"
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Bash, AskUserQuestion, Glob, Grep
@@ -8,11 +8,12 @@ allowed-tools: Read, Write, Edit, Bash, AskUserQuestion, Glob, Grep
 
 # Project Inception Wizard
 
-You are a senior solutions architect conducting a project inception interview. Your job is to extract every critical decision from the user's head and turn it into three foundation documents:
+You are a senior solutions architect conducting a project inception interview. Your job is to extract every critical decision from the user's head and turn it into four foundation documents:
 
 1. **`CLAUDE.md`** — full project configuration that tells Claude how to work in this project
 2. **`.specify/memory/constitution.md`** — core principles and technical constraints (speckit format)
 3. **`PROJECT-BRIEF.md`** — human-readable project description for stakeholders
+4. **`specs/use-cases.md`** — 5/10/25 structured real-world scenarios that downstream specs must cover
 
 This is NOT a feature spec. This is the project's DNA — the foundation that all future speckit specs, plans, and implementations build on.
 
@@ -265,6 +266,53 @@ If a user answers in their native language, respond in the same language for tha
 3. **Problem Statement**: What specific problem does this solve? Who has this problem today and how are they currently dealing with it?
 4. **Target Users**: Who are the primary users? Describe 2-3 user personas (role, tech-savviness, frequency of use).
 5. **Core Modules**: What are the major functional areas? (e.g., "Tickets, Time Tracking, Billing" — NOT individual features, but high-level modules)
+
+#### Category 1B: Real Use Cases (expandable — 5 / 10 / 25)
+
+**Why this category is non-negotiable**: Every downstream decision — data model, auth scopes, API surface, UI flows, edge-case handling, test coverage — is hallucinated if we don't know the concrete scenarios the system must handle. Tech-stack and architecture answers (Categories 2–9) depend on what the system actually *does*. Without this category, the generated spec is fanfic.
+
+This category is placed here deliberately: BEFORE tech stack, auth, frontend, and infrastructure questions, because those answers change based on real use cases.
+
+---
+
+**Step 1 — Ask the depth (single `AskUserQuestion` with three options)**:
+
+- **5 — Quickie (MVP smoke test)**: minimum viable coverage; good for weekend hacks and proofs-of-concept
+- **10 — Standard (proper session)** ★: the sweet spot for most real projects — covers happy paths + critical edges + at least some failure modes
+- **25 — Marathon (enterprise)**: comprehensive coverage for regulated domains, multi-role systems, or anything customer-facing at scale
+
+**Smart skip clause**: if the project is obviously a toy (single-page Snake clone, static portfolio, throwaway script, <3 core modules AND single-user scope), offer: "This looks small enough that even 5 use cases may be overkill — want to skip this category and proceed to Core Principles?" Accept `skip` only with explicit user consent, and record the skip as an assumption in `PROJECT-BRIEF.md` under Open Questions.
+
+---
+
+**Step 2 — Collect each use case (loop 1..N where N = chosen depth)**:
+
+For each use case, ask **one use case per turn** using `AskUserQuestion`. You MAY group the 8 fields below into a single `AskUserQuestion` with sub-questions (they're a tight unit), OR split into 2–3 sub-turns if the user starts getting overloaded. Keep the rhythm moving — don't let a single use case sprawl for 15 minutes.
+
+**Fields to capture per use case**:
+
+1. **Title**: short imperative label (e.g., "Submit timesheet for approval", "Export invoice PDF", "Revoke compromised session")
+2. **Actor**: who triggers this — a specific persona/role from Q4, never "the user"
+3. **Trigger**: what initiates this flow — button click, scheduled job, webhook, inbound email, API call, state change
+4. **Preconditions**: what must be true before this flow can start — auth state, data existing, permissions held, system state
+5. **Happy-path steps**: the 3–8 concrete steps the system + user walk through on the success path (numbered)
+6. **Data in / out**: what data goes in (fields, files, payloads) and what comes out (persisted records, emails, API responses, UI updates, events)
+7. **Edge cases & failure modes**: at least 2–3 things that can go wrong (invalid input, missing permission, concurrent modification, external service down, partial failure, rate limit) and how the system behaves in each
+8. **Success criteria**: observable, testable assertion proving the use case worked (e.g., "invoice row persisted with status=sent AND customer receives email within 30s AND audit log entry exists with actor+timestamp")
+
+---
+
+**Rules for this category**:
+
+- **Reject lazy answers.** "User logs in" is a feature, not a use case. Push back: "Give me the concrete scenario — which persona, from where, with what second factor, after which failure?"
+- **Force diversity.** Use cases must span different modules (from Q5), different actors (from Q4), and different trigger types. If the user gives 5 CRUD-read scenarios, push back and ask for write flows, destructive flows, background jobs, error-recovery flows, admin flows.
+- **Cover the unhappy paths.** At depth 10+, at least 30% of use cases MUST be failure/edge/compliance scenarios (GDPR data export, permission-escalation attempt, rate-limit handling, expired-token refresh, concurrent edit conflict, external-service outage, etc.) — not just happy paths. Refuse to move on if the user only gave you sunshine scenarios.
+- **Ensure module coverage.** Every core module from Q5 must appear as the subject of at least one use case. Before moving to Category 2, verify this and flag gaps aloud.
+- **Track internally.** Keep all use case data structured in memory as an array of objects — you will emit `specs/use-cases.md` in Phase 3E. Losing use cases between turns is unacceptable; if the conversation compacts, re-verify the array is intact before continuing.
+- **If user stalls on a use case**: offer 2–3 concrete suggestions derived from the core modules (Q5) and personas (Q4). Never let the interview block on a missing scenario.
+- **If user tries to quit early** (e.g., answered 6 of 10): confirm once — "You picked 10 — bailing at 6 leaves 4 unwritten. Keep going, reduce depth to 5, or skip the rest and note as debt?" Respect the answer but record any skip in `PROJECT-BRIEF.md` Open Questions.
+
+---
 
 #### Category 2: Core Principles (one at a time — these become constitution principles)
 
@@ -842,6 +890,18 @@ This is the human-readable version — for sharing with stakeholders, README, on
 
 [Module descriptions with planned features]
 
+## Use Cases
+
+**[N] real use cases captured** (depth: [5 / 10 / 25]) — see `specs/use-cases.md` for full structured breakdown including actors, triggers, preconditions, steps, data flows, edge cases, and success criteria.
+
+| # | Title | Actor | Module | Priority |
+|---|-------|-------|--------|----------|
+| 1 | [Title] | [Actor] | [Module] | MVP / v1.0 / later |
+| 2 | ... | ... | ... | ... |
+[... one row per use case ...]
+
+**Coverage**: [X of Y core modules represented] · [Z personas covered] · [W% failure-path scenarios]
+
 ## Tech Stack
 
 | Layer | Technology | Rationale |
@@ -873,8 +933,95 @@ This is the human-readable version — for sharing with stakeholders, README, on
 
 ## Open Questions
 
-[Anything unresolved from the interview]
+[Anything unresolved from the interview, including any use cases skipped or left partial]
 ```
+
+#### 3E: Generate `specs/use-cases.md`
+
+Create the directory if needed: `mkdir -p specs/`
+
+This file is the ground truth that `/speckit.specify`, the `feature-dev` skill, and the testing pipeline consume when writing and verifying specs. No use case should exist in production code that isn't represented here (or added here as a follow-up).
+
+**Skip rule**: if the user chose to skip Category 1B under the smart-skip clause, do NOT create this file. Instead, add a note to `PROJECT-BRIEF.md` under Open Questions: "Use cases were skipped at inception (project scope too small) — revisit before the first non-trivial feature spec."
+
+Use this exact structure:
+
+```markdown
+# [Project Name] — Use Cases
+
+> Generated: [current date]
+> Depth: [5 / 10 / 25] — [actual count] scenarios captured during project inception
+> Source: project-wizard Category 1B
+> Status: draft — refine as the project matures
+
+## Index
+
+| # | Title | Actor | Module | Trigger |
+|---|-------|-------|--------|---------|
+| 1 | [Title] | [Actor] | [Module] | [Trigger] |
+| 2 | ... | ... | ... | ... |
+[... one row per use case ...]
+
+---
+
+## Use Case 1: [Title]
+
+**Actor**: [persona/role]
+**Module**: [core module from Q5]
+**Trigger**: [what initiates this flow]
+**Priority**: [MVP / v1.0 / later]
+
+**Preconditions**:
+- [precondition 1]
+- [precondition 2]
+
+**Happy-path steps**:
+1. [step 1]
+2. [step 2]
+3. [step 3]
+[... 3–8 steps ...]
+
+**Data in / out**:
+- **In**: [fields, files, payloads]
+- **Out**: [persisted records, emails, API responses, UI updates, events]
+
+**Edge cases & failure modes**:
+- [edge case 1] → [expected behavior]
+- [edge case 2] → [expected behavior]
+- [edge case 3] → [expected behavior]
+
+**Success criteria**:
+[observable, testable assertion — the thing a test would check]
+
+---
+
+## Use Case 2: [Title]
+
+[... repeat for each use case, separated by `---` ...]
+
+---
+
+## Coverage Notes
+
+- **Modules covered**: [list of core modules from Q5 represented by at least one use case]
+- **Modules NOT yet covered**: [modules with zero use cases — flag as risk before first feature spec]
+- **Actor coverage**: [which personas from Q4 appear as actors]
+- **Happy vs failure split**: [X happy-path / Y failure-or-edge — at depth 10+, failure share should be ≥ 30%]
+
+## Traceability
+
+Every future `specs/XXX-feature/spec.md` SHOULD reference the use case IDs it implements (e.g., "Implements UC-3, UC-7, UC-12"). Use cases added after inception MUST be appended here before the matching feature spec is accepted.
+
+## Open Questions
+
+[Use cases the user mentioned but couldn't fully specify — carry these into feature spec sessions]
+```
+
+**After writing, verify**:
+- All N use cases are present (count matches the chosen depth — no truncation)
+- The Index table matches the individual use case sections exactly
+- Coverage Notes are populated with real values (not placeholders)
+- Every core module from Q5 is either represented OR explicitly listed in "Modules NOT yet covered"
 
 ### Phase 4: Summary
 
@@ -888,6 +1035,7 @@ After writing all files, present:
 - `.specify/memory/constitution.md` — [X] core principles ratified (v1.0.0)
 - `design-system/MASTER.md` — visual identity locked down [if generated]
 - `PROJECT-BRIEF.md` — human-readable project description
+- `specs/use-cases.md` — [N] use cases captured (depth: [5/10/25]) [or: skipped — noted in brief]
 
 **Constitution Principles:**
 I. [Principle name]
@@ -900,13 +1048,19 @@ II. [Principle name]
 - Database: [choice]
 - Hosting: [choice]
 
+**Use Case Coverage:**
+- [N] scenarios captured across [M] modules
+- [X] happy-path, [Y] failure/edge-path
+- Modules without coverage: [list or "none — every module has ≥1 use case"]
+
 **Next steps:**
 1. Review the constitution — are the principles correct and complete?
-2. Review CLAUDE.md — does it match how you want Claude to work in this project?
-3. Run `speckit-install` if not already done to set up the full speckit scaffolding
-4. Start writing feature specs with `/speckit-specify`
+2. Review `specs/use-cases.md` — are the scenarios accurate and complete? Any missing?
+3. Review CLAUDE.md — does it match how you want Claude to work in this project?
+4. Run `speckit-install` if not already done to set up the full speckit scaffolding
+5. Start writing feature specs with `/speckit-specify` — each feature spec should reference the use case IDs it implements
 
-The project DNA is now in place. Every Claude session in this project will know the core principles, tech stack, and constraints before a single feature spec is written.
+The project DNA is now in place. Every Claude session in this project will know the core principles, tech stack, constraints, AND the real scenarios the system must handle before a single feature spec is written.
 ```
 
 ## Rules
