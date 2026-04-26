@@ -1,6 +1,6 @@
 ---
 name: project-wizard
-description: "Project inception wizard (50 questions across 9 categories plus a 5/10/25 use-case deep dive) that creates CLAUDE.md, speckit constitution, design system, project brief, and specs/use-cases.md. Use when starting a new project, brainstorming an app idea, or bootstrapping a new repo. Trigger words: new project, project idea, start project, inception, bootstrap project."
+description: "Project inception wizard (50 questions across 9 categories plus a 5/10/25 use-case deep dive) that creates CLAUDE.md, speckit constitution, design system, project brief, and specs/use-cases.md. Also runs a brownfield deep-audit (Phase 0.5) when an existing codebase is detected, so Claude doesn't recommend infrastructure or implementations that won't work in the project's actual hosting/runtime environment. Use when starting a new project, brainstorming an app idea, bootstrapping a new repo, OR adopting Claude in an existing/legacy project. Trigger words: new project, project idea, start project, inception, bootstrap project, legacy project, existing project, brownfield, adopt claude, audit project, retrofit claude."
 argument-hint: "[brief project idea description]"
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Bash, AskUserQuestion, Glob, Grep
@@ -225,9 +225,304 @@ After absorbing all available context, present a brief summary to the user:
 [If blank slate]: This is a fresh project with no existing configuration. I'll walk you through everything from scratch.
 ```
 
-Then proceed to Phase 1.
+Then evaluate the brownfield trigger (below). If brownfield → Phase 0.5. Otherwise → Phase 1.
+
+---
+
+### Phase 0.5: Brownfield Deep-Audit (CONDITIONAL — runs ONLY when existing source code is detected)
+
+**Why this phase exists**: When Claude is dropped into an older project that predates the wizard, generic Phase 0 context absorption only reads `.claude/` and speckit files. It does NOT inspect the actual code, the deploy pipeline, the runtime, or the integrations the project already uses. As a result, Claude can confidently recommend hosting changes, deploy steps, or implementations that DO NOT WORK in the project's real environment. Phase 0.5 closes that gap — it audits the codebase before any interview question is asked, then forces a verification gate so nothing proceeds on assumptions.
+
+#### Trigger condition
+
+Run Phase 0.5 if **ANY** of the following are true. Otherwise skip it entirely and proceed to Phase 1.
+
+1. A project manifest exists at the repo root or one level deep:
+   - `package.json`, `*.csproj`, `*.sln`, `go.mod`, `pom.xml`, `build.gradle*`, `Cargo.toml`, `requirements.txt`, `pyproject.toml`, `Pipfile`, `composer.json`, `Gemfile`, `mix.exs`, `pubspec.yaml`, `deno.json`, `bun.lockb`
+2. A `src/`, `app/`, `lib/`, `pkg/`, or `cmd/` directory exists with **>5** source files
+3. The git history contains commits older than 7 days from today (this is not a fresh `git init`)
+4. The user explicitly invoked the wizard with brownfield trigger words ("legacy project", "existing project", "brownfield", "adopt claude", "audit project", "retrofit claude")
+
+If triggered, announce to the user:
+
+> Existing codebase detected. Before the interview, I'm running a deep audit of your code, deployment pipeline, runtime configuration, and integrations. This is critical for legacy projects — it's the only way I can avoid recommending infrastructure or implementations that won't work in your actual environment. This will take a minute.
+
+---
+
+#### Step 1 — Hosting & Deployment Forensics
+
+Use `Bash`, `Glob`, `Grep`, and `Read` (in parallel where independent) to actively search for every signal of how this project is built, packaged, and shipped. NEVER guess — only report what you find.
+
+**Containerization & orchestration:**
+```bash
+find . -maxdepth 3 \( -name "Dockerfile*" -o -name "docker-compose*.y*ml" -o -name ".dockerignore" \) -not -path "./node_modules/*" -not -path "./.git/*"
+find . -maxdepth 4 \( -path "*/k8s/*" -o -path "*/kubernetes/*" -o -path "*/helm/*" -o -path "*/charts/*" -o -path "*/manifests/*" \) -not -path "./node_modules/*"
+```
+
+**CI/CD pipelines (read every workflow file found — they describe the EXACT deploy process):**
+```bash
+ls .github/workflows/ 2>/dev/null
+ls .gitlab-ci.yml azure-pipelines.yml .circleci/config.yml Jenkinsfile bitbucket-pipelines.yml drone.yml 2>/dev/null
+```
+
+**Infrastructure-as-code:**
+```bash
+find . -maxdepth 3 \( -name "*.tf" -o -name "*.tfvars" -o -name "*.bicep" -o -name "Pulumi.yaml" -o -name "main.bicep" \) -not -path "./node_modules/*"
+find . -maxdepth 3 \( -name "ansible*" -o -path "*/playbooks/*" -o -name "Vagrantfile" \) -not -path "./node_modules/*"
+```
+
+**Platform-specific deploy configs:**
+```bash
+ls vercel.json netlify.toml fly.toml render.yaml railway.json railway.toml app.yaml \
+   Procfile Caddyfile nginx.conf .platform.app.yaml \
+   serverless.yml sam.yaml template.yaml cdk.json wrangler.toml \
+   2>/dev/null
+```
+
+**Deploy scripts:**
+```bash
+find . -maxdepth 3 \( -name "deploy*.sh" -o -name "deploy*.ps1" -o -path "*/scripts/deploy*" -o -name "Makefile" -o -name "Taskfile.y*ml" -o -name "justfile" \) -not -path "./node_modules/*"
+```
+
+**Application config (read keys only — NEVER log secret VALUES):**
+```bash
+ls appsettings*.json application*.yml application*.properties \
+   settings.py config.py wp-config.php config.ru \
+   2>/dev/null
+ls config/*.rb config/*.yml 2>/dev/null
+```
+
+**Env files (read KEY NAMES only, do not echo values):**
+```bash
+ls .env* env.example .env.template .env.example .envrc 2>/dev/null
+```
+
+**Build/run commands** — read the `scripts` section of `package.json`, targets in `Makefile`/`Taskfile.yml`/`justfile`, the `<Sdk>` and `<TargetFramework>` of `*.csproj`, the `module` line of `go.mod`, and `[project.scripts]` of `pyproject.toml`.
+
+After collection, build a hosting hypothesis. Report:
+
+```markdown
+## Hosting & Deployment Audit
+
+**Detected runtime**: [.NET 8 / Node 20 / Python 3.11 / Go 1.22 / PHP 8.2 / Ruby 3.3 / unknown]
+**Detected build tool**: [dotnet build / npm run build / vite / webpack / pip / cargo / unknown]
+**Detected container strategy**: [single Dockerfile / Compose stack / Swarm service / k8s manifests / Helm chart / serverless package / none detected]
+**Detected CI/CD**: [path to workflow file] — [trigger: push to main / PR / tag / manual]
+**Detected deploy mechanism**: [SCP+stack deploy / kubectl apply / vercel deploy / fly deploy / terraform apply / manual / unknown]
+**Detected hosting target**: [hypothesis based on the deploy mechanism — Noisy Cricket / AKS / Vercel / Fly / VPS / unknown]
+**Detected reverse proxy / domain**: [nginx.conf found / NPM hint / Caddy / Traefik / cloud LB / none]
+**Detected secrets handling**: [GH Secrets references in workflow / Azure Key Vault / Vault / .env only / unclear]
+
+**Confidence**: [HIGH / MEDIUM / LOW]
+**Gaps to fill via questions**: [bullet every uncertainty — e.g., "Dockerfile present but no CI deploy step found — how is this image actually shipped?"]
+```
+
+---
+
+#### Step 2 — Feature Inventory (read, don't ask)
+
+For the user's actual app to keep working, you need to know what it does today. Don't ask blind — read the code.
+
+**Backend routes/endpoints** — adapt to the detected stack:
+- ASP.NET: grep for `[HttpGet]`, `[HttpPost]`, `[HttpPut]`, `[HttpDelete]`, `MapGet(`, `MapPost(`, `MapPut(`, `MapDelete(`, `app.UseEndpoints`
+- Express/Fastify/Koa: grep for `app.get(`, `app.post(`, `router.get(`, `router.post(`, `fastify.get(`
+- NestJS: grep for `@Get(`, `@Post(`, `@Put(`, `@Delete(`, `@Controller(`
+- Django: read `urls.py` files (use `find . -name urls.py`)
+- Flask/FastAPI: grep for `@app.route`, `@router.get(`, `@router.post(`, `@app.get(`
+- Spring: grep for `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping`, `@RequestMapping`
+- Go: grep for `http.HandleFunc(`, `mux.HandleFunc(`, `r.GET(`, `r.POST(` (gin/echo/chi)
+- Rails: read `config/routes.rb`
+- Laravel: read `routes/web.php`, `routes/api.php`
+- Phoenix: read `lib/*_web/router.ex`
+
+**Frontend pages/views/components**:
+- Next.js (app router): list files in `app/` matching `page.{tsx,jsx,ts,js}`
+- Next.js (pages router): list files in `pages/`
+- React (vanilla): find the router config file (search for `createBrowserRouter`, `Routes`, `Switch`)
+- Vue/Nuxt: list `pages/` directory
+- SvelteKit: list `src/routes/`
+- Angular: read routing modules (search for `RouterModule.forRoot`)
+- Static: list `*.html` at root or in `public/` / `dist/`
+- Razor Pages / MVC: list `Pages/` and `Views/`
+- Blazor: list `*.razor` files
+
+**Database surface**:
+- Migration directories: `migrations/`, `db/migrate/`, `Migrations/` (EF), `prisma/migrations/`, `alembic/versions/`, `db/changelog/` (Liquibase), `flyway/`
+- Schema files: `schema.prisma`, `schema.sql`, `*.dbml`, `models.py` (Django ORM)
+- ORM entity definitions — count and list them (read class names only, don't dump full source)
+
+**Background work / queues / jobs**:
+- .NET: grep for `Hangfire`, `BackgroundService`, `IHostedService`, `Quartz`
+- Node: grep for `Bull`, `BullMQ`, `Agenda`, `node-cron`, `bree`
+- Python: grep for `Celery`, `RQ`, `APScheduler`, `huey`, `dramatiq`
+- Ruby: grep for `Sidekiq`, `ActiveJob`, `DelayedJob`, `Resque`
+- Go: grep for `asynq`, `machinery`, `gocron`
+- PHP: grep for `Laravel\Horizon`, `Symfony\Messenger`
+
+**Cron / scheduled tasks**: cron files (`crontab`, `/etc/cron.d/*`), GitHub Actions schedules (`on: schedule:`), k8s `CronJob` manifests, Hangfire recurring jobs, Quartz schedules.
+
+After collection:
+```markdown
+## Feature Inventory
+
+**Backend endpoints**: [N detected — list top 10 by path; record full list internally]
+**Frontend pages/views**: [N detected — list top 10]
+**Database tables/entities**: [N detected — list]
+**Background jobs**: [list every detected scheduled or queued worker]
+**Cron / scheduled tasks**: [list]
+
+**Inferred core modules** (pre-fills Q5): [grouping of endpoints + pages + tables into module names]
+**Confidence**: [HIGH / MEDIUM / LOW]
+**Gaps**: [features that look implemented but unclear what business problem they solve]
+```
+
+This pre-fills Q5 (Core Modules). Do NOT re-ask Q5 in Phase 2 — instead, in Step 4 confirm the inferred modules with the user and let them rename/regroup/add.
+
+---
+
+#### Step 3 — Runtime & Integration Map
+
+From config keys + dependency manifests + SDK imports, build a map of EVERY external service this project touches. **NEVER log secret values** — only key names and SDK presence.
+
+**Strategy:**
+- Read dependency manifests: `package.json` `dependencies` + `devDependencies`, `*.csproj` `<PackageReference>`, `requirements.txt`, `pyproject.toml` `[tool.poetry.dependencies]`, `go.mod` `require(...)`, `Gemfile`, `composer.json`
+- grep imports for known SDK signatures: `Stripe`, `Mailjet`, `SendGrid`, `Twilio`, `OpenAI`, `Anthropic`, `Auth0`, `Clerk`, `Supabase`, `aws-sdk`, `@aws-sdk/`, `Azure.`, `googleapis`, `firebase-admin`, `Sentry`, `DataDog`, `Fortnox`, `BankID`, `BankSignering`, `Klarna`, `Swish`, `Plausible`, `PostHog`
+- Read appsettings/.env KEY NAMES only — `Mailjet:ApiKey`, `Stripe__SecretKey`, `OPENAI_API_KEY` reveal what's wired without leaking secrets
+
+Output:
+```markdown
+## Integration Map
+
+**Email**: [Mailjet SDK detected via package.json + `Mailjet:ApiKey` config / SendGrid / SMTP / none]
+**SMS**: [Twilio / 46elks / none]
+**Push**: [Firebase / OneSignal / none]
+**Payments**: [Stripe SDK + `STRIPE_SECRET_KEY` env / Klarna / Swish / none]
+**Invoicing**: [Fortnox SDK / none]
+**AI/LLM**: [OpenAI SDK + `OPENAI_API_KEY` / Anthropic SDK / Azure OpenAI / none]
+**Embeddings/Vector**: [pgvector / Pinecone / Qdrant / none]
+**Auth (external)**: [BankID / Auth0 / Clerk / Microsoft Identity / Google OAuth / custom]
+**Storage**: [aws-sdk S3 / Azure.Storage.Blobs / Cloudflare R2 / local FS / NFS]
+**CDN**: [Cloudflare / Azure CDN / none]
+**Monitoring**: [Sentry SDK / Application Insights / Datadog / Grafana agent / none]
+**Analytics**: [Plausible / PostHog / GA / none]
+**Maps**: [Google Maps / Mapbox / OSM / none]
+**Calendar**: [Google Calendar API / Microsoft Graph / none]
+
+**Other notable dependencies**: [list any domain-specific SDK that might be load-bearing — e.g., Sveriges Riksbank API, Skatteverket integration, custom GraphQL gateway]
+**Gaps**: [config keys present but unclear what service they target — e.g., "Found `EXTERNAL_API_URL` in env but no SDK imports — what is this service?"]
+```
+
+---
+
+#### Step 4 — The 100% Understanding Gate
+
+Before proceeding to Phase 1, present a consolidated audit summary AND a checklist of uncertainties. For EVERY uncertainty in steps 1–3, use `AskUserQuestion` (one question per turn) to fill the gap.
+
+**Format:**
+```markdown
+## Brownfield Audit — Confirm or Correct
+
+I've audited the existing codebase. Here's my best understanding:
+
+**This project is**: [type — e.g., "a multi-tenant SaaS for service-desk ticketing"]
+**Stack**: [language + framework + DB + frontend]
+**Hosting**: [target platform with deploy mechanism]
+**Live integrations**: [list]
+**Core modules (inferred)**: [list with brief description]
+
+**Blind spots I MUST resolve before continuing:**
+1. [specific question 1 — derived from a "Gaps" item above]
+2. [specific question 2]
+[... one entry per uncertainty ...]
+
+I will now ask each blind-spot question one at a time. After that, I'll continue with the standard interview but skip everything the audit already answered.
+```
+
+Then loop through the uncertainty list with `AskUserQuestion`. **Do not proceed to Phase 1 until every blind spot is resolved**, either by an answer OR by an explicit "skip — assume X" decision recorded in the audit memory.
+
+**Mandatory blind-spot questions** (always ask these for brownfield projects, even if seemingly obvious from code — they are the classic ways Claude breaks legacy systems):
+
+1. **Production URL & access**: Where does this run today? Public URL, IP, or host name? Who has SSH/admin access to the box(es)?
+2. **Deploy ritual**: How is a change shipped to prod *today*? (manual SCP / `git push` to deploy / CI on merge to main / human runs a script). When was the last deploy and did it succeed?
+3. **Env parity**: How does local dev resemble prod? Same DB engine and version? Same auth provider? Same external services or stubs/sandboxes?
+4. **Known prod-only behavior**: Anything that works in prod but not locally? (caches, queues, scheduled jobs, third-party webhooks, SSO, geo-restricted services, etc.)
+5. **The "do not touch" list**: Files, modules, or systems where changes have historically broken things. What should Claude be extra-careful around?
+6. **Out-of-repo runtime config**: Any config that lives OUTSIDE this repo? (a server-side `.env`, an Azure App Configuration store, a Vault namespace, a manually-edited file on the box, AWS Parameter Store)
+7. **Drift from git**: Is the running prod the same as `main`, or has someone hotfixed the server directly without committing?
+8. **Migrations / data state**: How are DB migrations applied — automatically on deploy, manually, or ad-hoc? Any pending migrations not in the repo? Any production data hand-edited?
+9. **Backup & rollback**: Are there DB backups? Has a rollback ever been performed — does the team know how?
+10. **Existing testing surface**: Are there tests today? Do they pass? Are they run in CI? What % of the surface do they cover?
+
+These ten are the "Claude breaks legacy projects" classics. Always ask them — even if it feels redundant. The goal is 100% understanding, not 80%.
+
+---
+
+#### Step 5 — Persist the Audit
+
+After the gate is closed, write the audit results into a memory file `.specify/memory/brownfield-audit.md` so subsequent phases (and every future Claude session in this project) can reference the ground truth. Create the directory if needed.
+
+Use this exact structure:
+
+```markdown
+# Brownfield Audit — [project name]
+
+> Generated by project-wizard Phase 0.5 on [today's date]
+> Source of truth for hosting, runtime, integrations, and "do not touch" areas
+
+## Confirmed Stack
+- Backend: [language + framework + version]
+- Frontend: [framework + tooling]
+- Database: [engine + version + access pattern]
+- Other runtimes: [queue brokers, caches, search engines]
+
+## Confirmed Hosting & Deployment
+- Production URL: [url]
+- Hosting target: [Noisy Cricket / Vercel / AKS / VPS / etc.]
+- Deploy mechanism: [exact command sequence or workflow path]
+- Deploy trigger: [push to main / manual / tag]
+- Last known good deploy: [date if known]
+- Reverse proxy / SSL: [details]
+- Admin access: [who can SSH / who has cloud console access]
+
+## Confirmed Integrations
+[copy from Step 3 — final confirmed list with notes on what's MVP vs experimental vs deprecated]
+
+## Confirmed Core Modules
+[final module list with 1-line description per module]
+
+## Out-of-Repo Runtime Config
+[every config that lives outside the repo and the code depends on]
+
+## Do-Not-Touch List
+[fragile areas, modules with known traps, deprecated paths still in use]
+
+## Drift & Manual State
+[hotfixes on prod, manual DB tweaks, undocumented config, files on the box that are not in git]
+
+## Test & Quality State
+[existing test coverage, what passes, what's flaky, what's missing]
+
+## Open Risks
+[anything Claude should flag before recommending infrastructure changes]
+```
+
+This file is **the authoritative source** for the rest of the wizard AND for every future Claude session. The CLAUDE.md generated in Phase 3B MUST reference this file with a "READ FIRST before recommending infrastructure changes" instruction.
+
+---
+
+After Step 5, proceed to Phase 1. The audit drastically shortens Phase 2 because most of Categories 2, 3, 4, 7 are already answered.
+
+---
 
 ### Phase 1: Introduction
+
+**If Phase 0.5 ran (brownfield project)**: skip the elevator-pitch question entirely — you already know what the project is from the audit. Instead, open with:
+
+> Based on the audit, I understand this is [one-paragraph synthesis from `brownfield-audit.md`: what the system does, who it serves, where it runs, what it integrates with]. The interview from here is about your *intent going forward*: what's missing, what's broken, what's the next big push, and what rules you want Claude to follow on top of the existing reality. Where do you want to take this project?
+
+Wait for the user's direction, then proceed to Phase 2 — but throughout Phase 2, treat every question already answered by the audit as a CONFIRMATION ("I see X is in place — keep, change, or document differently?") not an open question.
+
+**If Phase 0.5 did NOT run (greenfield project)**:
 
 If `$ARGUMENTS` is not empty, acknowledge the project idea and summarize your understanding in 2-3 sentences.
 
@@ -380,17 +675,23 @@ For each use case, ask **one use case per turn** using `AskUserQuestion`. You MA
 
 #### Category 7: Infrastructure, Deployment & Services (one at a time, skip if simple static project)
 
-This category MUST be informed by Phase 0 context absorption. If `.claude/docs/deployment.md` was found, present the existing infrastructure as the default option. For Johan's projects, the standard infrastructure is the Noisy Cricket Linux cluster (live4.se) — always offer this as the primary option.
+This category MUST be informed by Phase 0 / 0.5 context absorption. If `.claude/docs/deployment.md` was found, present the existing infrastructure as the default option. For Johan's projects, the standard infrastructure is the Noisy Cricket Linux cluster (live4.se) — always offer this as the primary option **for greenfield projects only**.
+
+**Brownfield rule (NON-NEGOTIABLE)**: If Phase 0.5 ran and `.specify/memory/brownfield-audit.md` exists, every question in Category 7 is a CONFIRMATION, not an open question. Present each detected setting as: *"I detected X — keep it, change it, or document it differently?"* The recommended (★) option must be the audit-detected value, NOT the Noisy Cricket default. Recommending a hosting/deploy migration on a project that already runs somewhere else is treated as a breaking change and requires the user to explicitly opt in. If the user wants to migrate, that becomes a future feature spec — not a wizard answer.
 
 33. **Hosting**: Where does this run?
-    - **Noisy Cricket Linux cluster (live4.se)** — Docker Swarm on Azure, 1 manager + 3 workers, private Docker registry, NFS shared storage, Nginx Proxy Manager reverse proxy, Let's Encrypt SSL *(this is the standard for Johan's projects — recommended unless there's a reason to deviate)*
+
+    **Greenfield default options:**
+    - **Noisy Cricket Linux cluster (live4.se)** — Docker Swarm on Azure, 1 manager + 3 workers, private Docker registry, NFS shared storage, Nginx Proxy Manager reverse proxy, Let's Encrypt SSL *(standard for Johan's projects — recommended unless there's a reason to deviate)*
     - Kubernetes (managed — AKS, EKS, GKE)
     - PaaS (Vercel, Railway, Fly.io, Render)
     - VPS (Hetzner, DigitalOcean, Linode)
     - On-prem / self-hosted
     - Other
 
-    If Noisy Cricket is chosen, confirm: the deploy pipeline is GitHub Actions → build & test → stress test → Docker build → SCP to manager → push to private registry → `docker stack deploy`. The wizard should note that NFS directories and GitHub Secrets need to be set up (reference `.claude/docs/deployment.md` pattern).
+    **Brownfield default**: whatever the audit detected. Star (★) the detected value. Phrase the question as: *"The audit shows this runs on [detected]. Confirm and continue, or are you migrating?"*
+
+    If Noisy Cricket is chosen (greenfield) OR confirmed (brownfield), confirm the deploy pipeline: GitHub Actions → build & test → stress test → Docker build → SCP to manager → push to private registry → `docker stack deploy`. Note that NFS directories and GitHub Secrets need to be set up (reference `.claude/docs/deployment.md` pattern).
 
 34. **CI/CD**: Pipeline tool? (GitHub Actions ★ recommended for Noisy Cricket, GitLab CI, Azure DevOps)
 35. **Environments**: Which environments? (local + prod for MVP ★, or local + dev + staging + prod)
@@ -639,9 +940,32 @@ Core flow: **[primary user flow from interview]**
 - [Integration 2]
 [... from interview ...]
 
+## Brownfield Context (INCLUDE ONLY IF Phase 0.5 ran)
+
+This project predates Claude integration. The runtime, hosting, and integration constraints
+have been audited and recorded in `.specify/memory/brownfield-audit.md`. **READ THAT FILE
+BEFORE recommending any infrastructure, deployment, or integration change.**
+
+Key constraints that override generic best practices:
+
+- **Hosting**: [audit-detected target — exact platform and deploy mechanism]
+- **Deploy ritual**: [exact command sequence or workflow path that ships code today]
+- **Live integrations** (load-bearing — do not "modernize" without explicit ask): [list]
+- **Out-of-repo runtime config**: [server-side env, Vault, Azure App Config, etc.]
+- **Do-not-touch areas**: [fragile modules / files / systems]
+- **Drift from git**: [hotfixes on prod / manual DB tweaks / undocumented config]
+
+**Rules for Claude in this project**:
+
+1. When asked to "deploy" or "ship", default to the EXISTING deploy mechanism in the audit file — never the template's recommended one.
+2. When asked to add a new integration, check the audit file FIRST — there may already be an SDK in place that you can reuse.
+3. When asked to change infrastructure (Dockerfile, CI workflow, hosting target), explicitly flag it as a breaking change and confirm with the user before editing.
+4. When asked to add or change DB schema, confirm whether migrations are applied automatically on deploy or manually — the audit file records this.
+5. The "do-not-touch" list takes precedence over generic refactoring suggestions. Ask before editing anything on that list.
+
 ## CI/CD and deployment
 
-[Deployment details from interview. Reference .claude/docs/deployment.md if it exists.]
+[Deployment details from interview. For brownfield projects: copy the deploy ritual from `.specify/memory/brownfield-audit.md` verbatim. For greenfield: reference `.claude/docs/deployment.md` if it exists.]
 
 ## Workflow
 
@@ -1081,3 +1405,6 @@ The project DNA is now in place. Every Claude session in this project will know 
 14. The constitution version always starts at 1.0.0 for a new project.
 15. All dates in generated files must use the actual current date, not placeholders.
 16. If sibling projects use the same stack, reference their patterns (e.g., "Reference `/Users/jool/repos/matchgrid/` for GitHub deploy patterns").
+17. **Brownfield projects**: if Phase 0.5 trigger condition is met, Phase 0.5 is MANDATORY. NEVER skip it under any circumstance — even if the user says "just get on with it". The audit + the 100% understanding gate are the entire reason this skill works on legacy projects. Without them, Phase 2 will recommend implementations that break in the project's actual environment. The gate must remain closed (no Phase 1 progression) until every blind spot is resolved or explicitly waived with a recorded assumption. The 10 mandatory blind-spot questions must always be asked verbatim, even if the audit appears to have answered them.
+18. **Brownfield projects — never propose silent infrastructure changes**: in Categories 7–8 and in the generated CLAUDE.md, any deviation from what the audit detected (different hosting, different CI/CD, different secrets store) must be explicitly flagged to the user as a migration, not slipped in as a "recommendation". Migration is a feature spec, not a wizard answer.
+19. **Brownfield audit is authoritative**: `.specify/memory/brownfield-audit.md` is treated as ground truth for the rest of the wizard run AND for every future Claude session in the project. The generated CLAUDE.md must reference it with a "READ FIRST before infrastructure changes" instruction (already templated in Phase 3B).
