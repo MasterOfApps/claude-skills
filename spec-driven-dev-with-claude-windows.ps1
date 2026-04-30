@@ -27,10 +27,25 @@ function Test-Command($Name) {
 }
 
 Write-Section 'Spec-Driven Dev with Claude - Windows Installer'
+Write-Host 'Created by Johan Olofsson - Noisy Cricket' -ForegroundColor DarkGray
+Write-Host ''
+Write-Host 'About to install / update the following on this machine:' -ForegroundColor White
+Write-Host '  - uv             (only if not already installed)'
+Write-Host '  - Claude Code    (only if not already installed)'
+Write-Host '  - project-wizard skill   (always refreshed to latest)'
+Write-Host '  - project-update skill   (always refreshed to latest)'
+Write-Host ''
 Write-Host "Source : $RepoRawUrl"
 Write-Host "Target : $SkillsDir"
 Write-Host ''
 Write-Host 'Safe to re-run: tools are only installed if missing. Skills are always refreshed to the latest version.'
+Write-Host ''
+$confirm = Read-Host 'Continue? (y/N)'
+if ($confirm -notmatch '^(y|Y|yes|Yes|YES)$') {
+    Write-Host ''
+    Write-Host 'Cancelled. No changes were made.' -ForegroundColor Yellow
+    exit 0
+}
 
 # --- Step 1: Ensure target directory exists -----------------------------------
 Write-Section 'Step 1 / 5 - Prepare Claude config directory'

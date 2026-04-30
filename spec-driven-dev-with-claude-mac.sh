@@ -30,10 +30,36 @@ fail()    { printf '  %s[FAIL]%s %s\n' "$C_RED"    "$C_RESET" "$1"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 section 'Spec-Driven Dev with Claude - macOS Installer'
+printf '%sCreated by Johan Olofsson - Noisy Cricket%s\n' "$C_GRAY" "$C_RESET"
+echo
+echo 'About to install / update the following on this machine:'
+echo '  - uv             (only if not already installed)'
+echo '  - Claude Code    (only if not already installed)'
+echo '  - project-wizard skill   (always refreshed to latest)'
+echo '  - project-update skill   (always refreshed to latest)'
+echo
 echo "Source : ${REPO_RAW_URL}"
 echo "Target : ${SKILLS_DIR}"
 echo
 echo 'Safe to re-run: tools are only installed if missing. Skills are always refreshed to the latest version.'
+echo
+
+# When piped (curl ... | bash) stdin is the script itself; read from /dev/tty so the prompt is interactive.
+if [ -e /dev/tty ]; then
+    printf 'Continue? (y/N) '
+    read -r confirm < /dev/tty
+else
+    printf 'Continue? (y/N) '
+    read -r confirm
+fi
+case "${confirm}" in
+    y|Y|yes|Yes|YES) ;;
+    *)
+        echo
+        printf '%sCancelled. No changes were made.%s\n' "$C_YELLOW" "$C_RESET"
+        exit 0
+        ;;
+esac
 
 # --- Step 1: Ensure target directory exists -----------------------------------
 section 'Step 1 / 5 - Prepare Claude config directory'
