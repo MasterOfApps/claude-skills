@@ -4,7 +4,7 @@
 # No git required.
 #
 # Usage (PowerShell on Windows 10/11, run as Administrator):
-#   irm https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/spec-driven-dev-with-claude-windows.ps1 | iex
+#   irm https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/install-windows.ps1 | iex
 
 $ErrorActionPreference = 'Stop'
 

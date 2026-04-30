@@ -13,19 +13,19 @@ Pick the line for your operating system, paste it into a terminal, press Enter. 
 Otherwise — open **PowerShell as administrator** and paste:
 
 ```powershell
-irm https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/spec-driven-dev-with-claude-windows.ps1 | iex
+irm https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/install-windows.ps1 | iex
 ```
 
 ### macOS
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/spec-driven-dev-with-claude-mac.sh | bash
+curl -fsSL https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/install-mac.sh | bash
 ```
 
 ### Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/spec-driven-dev-with-claude-linux.sh | bash
+curl -fsSL https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/install-linux.sh | bash
 ```
 
 ### What each script does
@@ -80,5 +80,5 @@ Options:
 
 1. Create a directory at the repo root: `my-skill/SKILL.md`
 2. Follow the [Agent Skills standard](https://agentskills.io)
-3. Add the skill name to the `SKILLS` array in all three installers (`spec-driven-dev-with-claude-windows.ps1`, `spec-driven-dev-with-claude-mac.sh`, `spec-driven-dev-with-claude-linux.sh`)
+3. Add the skill name to the `SKILLS` array in all three installers (`install-windows.ps1`, `install-mac.sh`, `install-linux.sh`)
 4. Commit and push to `main` — the next time anyone runs the installer, the new skill is fetched automatically.

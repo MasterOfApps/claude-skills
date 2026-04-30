@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Spec-Driven Dev with Claude - Linux Installer
+# Spec-Driven Dev with Claude - macOS Installer
 # Installs project-wizard and project-update skills into ~/.claude/skills/.
 # Auto-installs uv (needed by /project-wizard) and Claude Code CLI if missing.
 # No git required.
 #
-# Usage (any Linux terminal):
-#   curl -fsSL https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/spec-driven-dev-with-claude-linux.sh | bash
+# Usage (Terminal on macOS):
+#   curl -fsSL https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/install-mac.sh | bash
 
 set -euo pipefail
 
@@ -29,7 +29,7 @@ fail()    { printf '  %s[FAIL]%s %s\n' "$C_RED"    "$C_RESET" "$1"; }
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
-section 'Spec-Driven Dev with Claude - Linux Installer'
+section 'Spec-Driven Dev with Claude - macOS Installer'
 printf '%sCreated by Johan Olofsson - Noisy Cricket%s\n' "$C_GRAY" "$C_RESET"
 echo
 echo 'About to install / update the following on this machine:'
@@ -61,17 +61,6 @@ case "${confirm}" in
         ;;
 esac
 
-# Sanity: ensure curl exists; on most distros it does, but minimal containers may not have it.
-if ! have curl; then
-    fail 'curl is required to run this installer.'
-    echo '  Install it first with your package manager, e.g.:'
-    echo '    Debian/Ubuntu : sudo apt update && sudo apt install -y curl'
-    echo '    Fedora/RHEL   : sudo dnf install -y curl'
-    echo '    Arch          : sudo pacman -S curl'
-    echo '    Alpine        : sudo apk add curl'
-    exit 1
-fi
-
 # --- Step 1: Ensure target directory exists -----------------------------------
 section 'Step 1 / 5 - Prepare Claude config directory'
 if [ ! -d "${SKILLS_DIR}" ]; then
@@ -88,6 +77,7 @@ if have uv; then
 else
     echo '  uv not found - installing it now (needed by /project-wizard for speckit)...'
     if curl -LsSf https://astral.sh/uv/install.sh | sh; then
+        # uv installs into ~/.local/bin or ~/.cargo/bin — make it reachable in this session
         export PATH="${HOME}/.local/bin:${HOME}/.cargo/bin:${PATH}"
         if have uv; then
             ok 'uv installed and available'
@@ -101,7 +91,7 @@ else
     fi
 fi
 
-# --- Step 3: Download / refresh skills ----------------------------------------
+# --- Step 3: Download skills --------------------------------------------------
 section 'Step 3 / 5 - Download / refresh skills from GitHub'
 synced=0
 for skill in "${SKILLS[@]}"; do
@@ -133,6 +123,7 @@ if have claude; then
 else
     echo '  Claude Code CLI not found - installing it now...'
     if curl -fsSL https://claude.ai/install.sh | bash; then
+        # Claude Code installs into ~/.local/bin — make it reachable in this session
         export PATH="${HOME}/.local/bin:${PATH}"
         if have claude; then
             ok 'Claude Code installed and available'
