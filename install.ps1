@@ -98,15 +98,33 @@ if ($installed -eq 0) {
     exit 1
 }
 
-# --- Step 4: Check Claude Code is installed -----------------------------------
-Write-Section 'Step 4 / 5 - Check Claude Code'
+# --- Step 4: Check / install Claude Code --------------------------------------
+Write-Section 'Step 4 / 5 - Check / install Claude Code'
 
 if (Test-Command 'claude') {
-    Write-Ok 'Claude Code CLI (claude) found'
+    Write-Ok 'Claude Code CLI (claude) already installed'
 } else {
-    Write-Warn 'Claude Code CLI (claude) NOT found.'
-    Write-Host '  Install Claude Code from: https://claude.com/claude-code' -ForegroundColor Yellow
-    Write-Host '  After installing, close and reopen PowerShell so the "claude" command becomes available.' -ForegroundColor Yellow
+    Write-Host '  Claude Code CLI not found - installing it now...' -ForegroundColor Yellow
+    try {
+        Invoke-Expression (Invoke-RestMethod -Uri 'https://claude.ai/install.ps1' -UseBasicParsing)
+
+        # Refresh PATH for the current session so claude is reachable immediately
+        $machinePath = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
+        $userPath    = [System.Environment]::GetEnvironmentVariable('Path', 'User')
+        $env:Path    = "$machinePath;$userPath"
+
+        if (Test-Command 'claude') {
+            Write-Ok 'Claude Code installed and available'
+        } else {
+            Write-Warn 'Claude Code installed but not yet on PATH - close and reopen PowerShell, then type "claude" to start.'
+        }
+    }
+    catch {
+        Write-Fail "Could not install Claude Code automatically: $($_.Exception.Message)"
+        Write-Host '  Install it manually with:' -ForegroundColor Yellow
+        Write-Host '    powershell -ExecutionPolicy Bypass -c "irm https://claude.ai/install.ps1 | iex"' -ForegroundColor Yellow
+        Write-Host '  Or download from: https://claude.com/claude-code' -ForegroundColor Yellow
+    }
 }
 
 # --- Step 5: Done -------------------------------------------------------------

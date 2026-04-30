@@ -9,11 +9,10 @@ If anything looks different from what is described here, stop and ask — do not
 ## What you need before you start
 
 - [x] A Windows 11 PC
-- [x] Claude Code installed (if not, install it first from <https://claude.com/claude-code>)
 - [x] A folder on your computer where you keep screenshots / notes about the project you want to build (e.g. `C:\Users\YourName\Pictures\MyProjectIdea`)
 - [x] An internet connection
 
-That is it. No git. No GitHub account. No previous knowledge.
+That is it. No git. No GitHub account. No Claude Code pre-installed. No previous knowledge. The installer in Step 2 fetches everything for you, including Claude Code itself.
 
 ---
 
