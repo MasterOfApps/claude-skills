@@ -1,8 +1,20 @@
 # Claude Skills
 
-Shared Claude Code skills for Johan & David.
+Shared Claude Code skills.
 
-## Install skills
+## Install — Windows 11 (no git required)
+
+**First time on a Windows machine?** Follow the step-by-step guide in [START-HERE-WINDOWS.md](START-HERE-WINDOWS.md). It assumes nothing.
+
+For everyone else — open **PowerShell as administrator** and paste:
+
+```powershell
+irm https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/install.ps1 | iex
+```
+
+The installer auto-installs `uv` if missing and downloads both skills directly from GitHub. No `git clone` needed.
+
+## Install — macOS / Linux
 
 ```bash
 git clone https://github.com/MasterOfApps/claude-skills.git
@@ -11,6 +23,10 @@ bash install.sh
 ```
 
 ## Update skills
+
+**Windows:** re-run the same `irm ... | iex` command — it overwrites with the latest versions.
+
+**macOS / Linux:**
 
 ```bash
 cd claude-skills
