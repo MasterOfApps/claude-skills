@@ -1,9 +1,10 @@
-# Claude Skills - Windows Installer
+# Spec-Driven Dev with Claude - Windows Installer
 # Installs project-wizard and project-update skills into the user's Claude Code config.
-# No git required. Auto-installs uv (needed by /project-wizard) if missing.
+# Auto-installs uv (needed by /project-wizard) and Claude Code CLI if missing.
+# No git required.
 #
 # Usage (PowerShell on Windows 10/11, run as Administrator):
-#   irm https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/spec-driven-dev-with-claude-windows.ps1 | iex
 
 $ErrorActionPreference = 'Stop'
 
@@ -25,9 +26,11 @@ function Test-Command($Name) {
     $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
-Write-Section 'Claude Skills - Windows Installer'
+Write-Section 'Spec-Driven Dev with Claude - Windows Installer'
 Write-Host "Source : $RepoRawUrl"
 Write-Host "Target : $SkillsDir"
+Write-Host ''
+Write-Host 'Safe to re-run: tools are only installed if missing. Skills are always refreshed to the latest version.'
 
 # --- Step 1: Ensure target directory exists -----------------------------------
 Write-Section 'Step 1 / 5 - Prepare Claude config directory'
@@ -70,11 +73,12 @@ if (Test-Command 'uv') {
 # --- Step 3: Download skills --------------------------------------------------
 Write-Section 'Step 3 / 5 - Download skills from GitHub'
 
-$installed = 0
+$synced = 0
 foreach ($skill in $Skills) {
     $skillDir  = Join-Path $SkillsDir $skill
     $skillFile = Join-Path $skillDir  'SKILL.md'
     $sourceUrl = "$RepoRawUrl/$skill/SKILL.md"
+    $action    = if (Test-Path $skillFile) { 'updated' } else { 'installed' }
 
     try {
         if (-not (Test-Path $skillDir)) {
@@ -83,8 +87,8 @@ foreach ($skill in $Skills) {
 
         $response = Invoke-WebRequest -Uri $sourceUrl -UseBasicParsing -ErrorAction Stop
         [System.IO.File]::WriteAllText($skillFile, $response.Content, (New-Object System.Text.UTF8Encoding $false))
-        Write-Ok "$skill -> $skillFile"
-        $installed++
+        Write-Ok "$skill $action -> $skillFile"
+        $synced++
     }
     catch {
         Write-Fail "$skill - could not download from $sourceUrl"
@@ -92,9 +96,9 @@ foreach ($skill in $Skills) {
     }
 }
 
-if ($installed -eq 0) {
+if ($synced -eq 0) {
     Write-Host ''
-    Write-Fail 'No skills were installed. Check your internet connection and try again.'
+    Write-Fail 'No skills were synced. Check your internet connection and try again.'
     exit 1
 }
 
@@ -131,7 +135,7 @@ if (Test-Command 'claude') {
 Write-Section 'Step 5 / 5 - Done'
 
 Write-Host ''
-Write-Host "Installed $installed skill(s):" -ForegroundColor Green
+Write-Host "Synced $synced skill(s) (latest version from GitHub):" -ForegroundColor Green
 foreach ($skill in $Skills) {
     $skillFile = Join-Path $SkillsDir "$skill\SKILL.md"
     if (Test-Path $skillFile) { Write-Host "  - /$skill" -ForegroundColor Green }

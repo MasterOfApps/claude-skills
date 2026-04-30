@@ -42,7 +42,7 @@ This single command installs everything you need: the `/project-wizard` skill, t
 **Copy the line below exactly**, then **right-click in the PowerShell window** to paste it, and press **Enter**.
 
 ```powershell
-irm https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/spec-driven-dev-with-claude-windows.ps1 | iex
 ```
 
 You will see output like:

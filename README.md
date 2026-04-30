@@ -1,137 +1,84 @@
 # Claude Skills
 
-Shared Claude Code skills.
+Shared Claude Code skills: `/project-wizard` and `/project-update`. One-line installer per platform — no git, no GitHub account needed. Re-run any time to refresh skills to the latest version; tools (`uv`, Claude Code) are only installed if missing.
 
-## Install — Windows 11 (no git required)
+## Install / Update
 
-**First time on a Windows machine?** Follow the step-by-step guide in [START-HERE-WINDOWS.md](START-HERE-WINDOWS.md). It assumes nothing.
+Pick the line for your operating system, paste it into a terminal, press Enter. Re-running performs an update.
 
-For everyone else — open **PowerShell as administrator** and paste:
+### Windows 11
+
+**First time on a Windows machine?** Follow the step-by-step guide in [START-HERE-WINDOWS.md](START-HERE-WINDOWS.md) — it assumes no prior knowledge.
+
+Otherwise — open **PowerShell as administrator** and paste:
 
 ```powershell
-irm https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/spec-driven-dev-with-claude-windows.ps1 | iex
 ```
 
-The installer auto-installs `uv` if missing and downloads both skills directly from GitHub. No `git clone` needed.
-
-## Install — macOS / Linux
+### macOS
 
 ```bash
-git clone https://github.com/MasterOfApps/claude-skills.git
-cd claude-skills
-bash install.sh
+curl -fsSL https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/spec-driven-dev-with-claude-mac.sh | bash
 ```
 
-## Update skills
-
-**Windows:** re-run the same `irm ... | iex` command — it overwrites with the latest versions.
-
-**macOS / Linux:**
+### Linux
 
 ```bash
-cd claude-skills
-git pull
-bash install.sh
+curl -fsSL https://raw.githubusercontent.com/MasterOfApps/claude-skills/main/spec-driven-dev-with-claude-linux.sh | bash
 ```
+
+### What each script does
+
+1. Creates `~/.claude/skills/` if missing.
+2. Installs `uv` if missing (needed by `/project-wizard` for speckit).
+3. Downloads / refreshes `project-wizard/SKILL.md` and `project-update/SKILL.md` from this repo.
+4. Installs Claude Code CLI if missing.
+5. Prints the next steps.
+
+Re-running the same command updates the skills to the latest version and skips anything already installed.
 
 ## Available Skills
 
 | Skill | Command | Description |
-|-------|---------|-------------|
-| project-wizard | `/project-wizard` | Project inception wizard — installs speckit, syncs config from template repo, then runs 50 questions across 9 categories. Creates CLAUDE.md, constitution, design system, and project brief. |
+|---|---|---|
+| project-wizard | `/project-wizard` | Project inception wizard — installs speckit, syncs config from template repo, then runs 50 questions across 9 categories. Creates `CLAUDE.md`, constitution, design system, and project brief. |
 | project-update | `/project-update` | Update speckit and sync Claude Code configuration from the template repo. For existing projects that need the latest rules, docs, agents, skills, and hooks. |
 
-## Requirements
-
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
-- [uv](https://docs.astral.sh/uv/) installed (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- Works on macOS and Linux
-
----
-
-## New Project — Complete Setup Guide
-
-When starting a brand new project, follow these steps in order.
-
-### Step 1: Install skills (one-time)
-
-If you haven't already:
+## New project — full sequence
 
 ```bash
-git clone https://github.com/MasterOfApps/claude-skills.git
-cd claude-skills
-bash install.sh
-cd ..
-```
-
-### Step 2: Create the project directory
-
-```bash
-mkdir my-new-project
-cd my-new-project
-```
-
-### Step 3: Run the project wizard
-
-Start Claude Code and run the wizard:
-
-```bash
-claude
-```
-
-```
-/project-wizard An issue tracking system for municipalities
-```
-
-The wizard automatically handles everything:
-
-1. **Installs/updates speckit** — `uv tool install specify-cli` + `specify init`
-2. **Syncs Claude Code config** — fetches the latest sync-prompt from [johanolofsson72/Claude](https://github.com/johanolofsson72/Claude) and applies it (rules, docs, agents, skills, hooks, settings)
-3. **Preserves constitution** — backs up before speckit init, restores after
-4. **Asks about tech stack** — removes irrelevant files
-5. **Runs the interview** — 50 questions across 9 categories
-6. **Generates foundation docs** — CLAUDE.md, constitution, design system, project brief
-
-After this, every Claude session in the project knows the full context, and you can start writing feature specs with `/speckit-specify`.
-
-### Updating an existing project
-
-To sync an existing project with the latest config (without re-running the interview):
-
-```
-/project-update
-```
-
-Options:
-- `/project-update` — full update (speckit + sync config)
-- `/project-update speckit-only` — only update speckit CLI and templates
-- `/project-update sync-only` — only sync Claude Code config from template repo
-
-### Quick reference — the full sequence
-
-```bash
-# 1. Create project
+# 1. Create project folder (or cd into an existing one with screenshots / notes)
 mkdir my-project && cd my-project
 
-# 2. Start Claude and run the wizard (handles everything)
+# 2. Start Claude Code
 claude
+
+# 3. Run the wizard (in the Claude prompt)
 # /project-wizard An issue tracking system for municipalities
 
-# 3. Start building
+# 4. After the wizard finishes, start writing feature specs
 # /speckit-specify
 ```
 
-### Quick reference — update existing project
+## Update an existing project
+
+In the project's directory:
 
 ```bash
-cd my-project
 claude
 # /project-update
 ```
 
-## Adding New Skills
+Options:
 
-1. Create a directory: `my-skill/SKILL.md`
+- `/project-update` — full update (speckit + sync config)
+- `/project-update speckit-only` — only update speckit CLI and templates
+- `/project-update sync-only` — only sync Claude Code config from template repo
+
+## Adding new skills to this repo
+
+1. Create a directory at the repo root: `my-skill/SKILL.md`
 2. Follow the [Agent Skills standard](https://agentskills.io)
-3. Run `bash install.sh my-skill` to test
-4. Commit and push
+3. Add the skill name to the `SKILLS` array in all three installers (`spec-driven-dev-with-claude-windows.ps1`, `spec-driven-dev-with-claude-mac.sh`, `spec-driven-dev-with-claude-linux.sh`)
+4. Commit and push to `main` — the next time anyone runs the installer, the new skill is fetched automatically.
